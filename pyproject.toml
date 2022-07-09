@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "dominion_league_tools"
+version = "0.1.0"
+description = "Tools for helping manage league, interfacing with google sheets and discord."
+authors = ["jakkdl <h6+github@pm.me>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+google-api-python-client = "^2.51.0"
+google-auth-httplib2 = "^0.1.0"
+google-auth-oauthlib = "^0.5.2"
+discord2 = "^2.0.1"
+
+[tool.poetry.dev-dependencies]
+pylint = "^2.14.3"
+mypy = "^0.961"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+strict = false
