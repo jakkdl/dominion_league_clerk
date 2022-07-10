@@ -21,3 +21,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
 strict = false
+
+[tool.pylint]
+disable = ["missing-class-docstring"]

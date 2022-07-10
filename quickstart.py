@@ -9,8 +9,9 @@ from googleapiclient.discovery import build, Resource
 from googleapiclient.errors import HttpError
 
 import discord
-from discord.ext.commands import slash_command
-
+import discord.ext.commands as commands # pylint: disable=consider-using-from-import
+#import discord.ext
+#from discord.ext import commands
 
 from discord.bot import ApplicationCommandMixin
 
@@ -92,24 +93,24 @@ def get_requested_roles(sheet: Resource) -> dict[str, list[str]]:
 
     return users
 
-class MyBot(discord.Bot):
-    def __init__(self, intents: discord.flags.Intents, sheet_resource: Resource) -> None:
-        super().__init__(intents=intents)
+class MyCog(commands.Cog):
+    def __init__(self, bot, sheet_resource: Resource) -> None:
+        super().__init__()
+        self.bot = bot
         self.sheet_resource = sheet_resource
 
+    @commands.Cog.listener()
     async def on_ready(self):
-        print(f"{self.user} is ready and online!")
-        for guild in self.guilds:
-            try:
-                await ApplicationCommandMixin.get_desynced_commands(self, guild.id)
-            except discord.errors.Forbidden:
-                print(f"Slash commands are disabled in {guild}")
+        print(f'We have logged in as {self.bot.user}')
 
-    @MyBot.slash_command(self, name="fixroles", description="fix league roles for a specified season")
-    async def fix_roles(self, ctx: discord.ApplicationContext) -> None:
-        guild = ctx.interaction.guild
-        if not guild:
-            print("fixroles sent outside guild")
+    @commands.command()
+    async def hello(self, ctx, *, member: discord.Member = None):
+        """Says hello"""
+        member = member or ctx.author
+        await ctx.send(f'Hello {member}~')
+
+
+
 
 def main() -> None:
     """Shows basic usage of the Sheets API.
@@ -139,9 +140,11 @@ def main() -> None:
     sheet: Resource = service.spreadsheets()
 
 
-    intents = discord.Intents.default()
+    #intents = discord.Intents.default()
     #intents.members = True
-    bot = MyBot(intents=intents, sheet_resource = sheet)
+    #bot = MyBot(intents=intents, sheet_resource = sheet)
+    bot = commands.Bot()
+    bot.add_cog(MyCog(bot, sheet))
 
     with open('discord_token', encoding='utf-8') as file:
         discord_token = file.readline().strip()
