@@ -1,0 +1,5 @@
+__pycache__
+token.json
+discord_token
+credentials.json
+req_roles.pickle

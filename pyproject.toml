@@ -9,7 +9,7 @@ python = "^3.10"
 google-api-python-client = "^2.51.0"
 google-auth-httplib2 = "^0.1.0"
 google-auth-oauthlib = "^0.5.2"
-discord2 = "^2.0.1"
+nextcord = "^2.0.0"
 
 [tool.poetry.dev-dependencies]
 pylint = "^2.14.3"
@@ -23,4 +23,7 @@ build-backend = "poetry.core.masonry.api"
 strict = false
 
 [tool.pylint]
-disable = ["missing-class-docstring"]
+disable = [
+"missing-class-docstring",
+"missing-function-docstring",
+]
