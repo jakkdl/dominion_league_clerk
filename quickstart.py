@@ -131,9 +131,11 @@ def mismatching_roles(
     for d_id, roles in requested_roles.items():
         member = guild.get_member(d_id)
         if member is None:
+            # TODO
             print(f"failed to find member {d_id}")
             continue
 
+        # TODO: division roles
         parsed_roles = set(role_lookup(role) for role in roles)
         actual_roles = set(member.roles)
         add_roles = parsed_roles - actual_roles
@@ -171,7 +173,10 @@ class MyCog(commands.Cog):
     ):
         """Says hello"""
         hello_target = member or interaction.user
-        await interaction.send(f"Hello {hello_target}~")
+        if hello_target is None:
+            await interaction.send("Hello :)")
+            return
+        await interaction.send(f"Hello <@{hello_target.id}>~")
 
     @nextcord.slash_command(dm_permission=True)
     async def addrole(
@@ -188,7 +193,7 @@ class MyCog(commands.Cog):
 
         await member.add_roles(
             cast(nextcord.abc.Snowflake, role),
-            reason=f"added in addrole on behest of {interaction.user}",
+            reason=f"function: addrole, caller: {interaction.user}",
         )
         await interaction.send(f"Adding `{role}` to <@{member.id}>")
 
@@ -207,19 +212,19 @@ class MyCog(commands.Cog):
 
         await member.remove_roles(
             cast(nextcord.abc.Snowflake, role),
-            reason=f"removed in removerole on behest of {interaction.user}",
+            reason=f"function: removerole, caller: {interaction.user}",
         )
         await interaction.send(f"Removing `{role}` from <@{member.id}>")
 
     @nextcord.slash_command(dm_permission=True)
     async def update_requested_roles(self, interaction: nextcord.Interaction):
-        """Quits"""
+        """Update cache of requested roles in Setup sheet in the background"""
         task = asyncio.create_task(
             self.my_wrapper(cast(nextcord.abc.Messageable, interaction.channel))
         )
         self.background_tasks.add(task)
         task.add_done_callback(self.background_tasks.discard)
-        await interaction.send("Running sheets update in background~")
+        await interaction.send("Running sheets update in background...")
 
     @nextcord.slash_command(dm_permission=True)
     async def quit(self, interaction: nextcord.Interaction):
@@ -230,15 +235,14 @@ class MyCog(commands.Cog):
 
     @nextcord.slash_command(dm_permission=True)
     async def mismatching_roles(self, interaction: nextcord.Interaction):
-        """Quits"""
+        """Print which league roles are missing/extranous according to setup sheet"""
         # warn if out of date, error if missing
         with open("req_roles.pickle", "rb") as file:
             requested_roles = pickle.load(file)
         dom_guild = [g for g in self.bot.guilds if g.id == 212660788786102272].pop()
         mmmr = mismatching_roles(dom_guild, requested_roles)
-        # send members not found
-        # send members missing roles
-        # print(mmmr)
+        # TODO: send members not found
+
         lines = []
         for member, (add, remove) in mmmr.items():
             strname = member.name + "#" + str(member.discriminator)
@@ -253,6 +257,13 @@ class MyCog(commands.Cog):
 
     @nextcord.slash_command(dm_permission=True)
     async def fix_roles(self, interaction: nextcord.Interaction, *, write: bool = False):
+        """Fix league roles according to setup sheet. POTENTIALLY DANGEROUS
+
+        Parameters
+        ---------
+        write: Optional[bool]
+            Set to True to actually make changes to roles. Will otherwise just print changes.
+        """
         with open("req_roles.pickle", "rb") as file:
             requested_roles = pickle.load(file)
         dom_guild = [g for g in self.bot.guilds if g.id == 212660788786102272].pop()
