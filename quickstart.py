@@ -45,7 +45,7 @@ RoleList: TypeAlias = dict[int, list[str]]
 
 async def get_requested_roles(sheet: Resource) -> RoleList:
     """returns a dict of discord_id's and requested discord roles given a season setup sheet"""
-    print('poop')
+    print("poop")
     result = None
     users: RoleList = {}
     for tries in range(TIMEOUT_TRIES):
@@ -115,7 +115,7 @@ def get_roles(guild: nextcord.Guild, user_id: int) -> list[str]:
 
 def mismatching_roles(
     guild: nextcord.Guild, requested_roles: RoleList
-) -> dict[nextcord.Member, set[nextcord.Role]]:
+) -> dict[nextcord.Member, tuple[set[nextcord.Role], set[nextcord.Role]]]:
     def role_lookup(rolename: str) -> nextcord.Role:
         role = roles_lookup.pop(rolename, None)
         if role is not None:
@@ -128,21 +128,23 @@ def mismatching_roles(
     roles_lookup: dict[str, nextcord.Role] = {}
     result = {}
 
-
     for d_id, roles in requested_roles.items():
         member = guild.get_member(d_id)
         if member is None:
-            print(f'failed to find member {d_id}')
+            print(f"failed to find member {d_id}")
             continue
 
         parsed_roles = set(role_lookup(role) for role in roles)
         actual_roles = set(member.roles)
-        diff_roles = parsed_roles - actual_roles
-        if not diff_roles:
+        add_roles = parsed_roles - actual_roles
+        remove_roles = {
+            r for r in actual_roles - parsed_roles if r.name in USERS_ROLE_HEADERS
+        }
+        if not add_roles and not remove_roles:
             continue
-        result[member] = parsed_roles - actual_roles
+        result[member] = (add_roles, remove_roles)
 
-    print([(f'@{m.name}#{m.discriminator}',roles) for m,roles in result.items()])
+    print([(f"@{m.name}#{m.discriminator}", roles) for m, roles in result.items()])
     return result
 
 
@@ -180,7 +182,34 @@ class MyCog(commands.Cog):
         role: nextcord.Role,
     ):
         """Add role to user"""
-        await interaction.send(f"Adding {role} to {member}")
+        if role in member.roles:
+            await interaction.send(f"<@{member.id}> already has role `{role}`")
+            return
+
+        await member.add_roles(
+            cast(nextcord.abc.Snowflake, role),
+            reason=f"added in addrole on behest of {interaction.user}",
+        )
+        await interaction.send(f"Adding `{role}` to <@{member.id}>")
+
+    @nextcord.slash_command(dm_permission=True)
+    async def removerole(
+        self,
+        interaction: nextcord.Interaction,
+        *,
+        member: nextcord.Member,
+        role: nextcord.Role,
+    ):
+        """Remove role from user"""
+        if role not in member.roles:
+            await interaction.send(f"<@{member.id}> does not have role `{role}`")
+            return
+
+        await member.remove_roles(
+            cast(nextcord.abc.Snowflake, role),
+            reason=f"removed in removerole on behest of {interaction.user}",
+        )
+        await interaction.send(f"Removing `{role}` from <@{member.id}>")
 
     @nextcord.slash_command(dm_permission=True)
     async def update_requested_roles(self, interaction: nextcord.Interaction):
@@ -195,6 +224,7 @@ class MyCog(commands.Cog):
     @nextcord.slash_command(dm_permission=True)
     async def quit(self, interaction: nextcord.Interaction):
         """Quits"""
+        print("quitting")
         await interaction.send("Quitting~")
         await self.bot.close()
 
@@ -208,8 +238,40 @@ class MyCog(commands.Cog):
         mmmr = mismatching_roles(dom_guild, requested_roles)
         # send members not found
         # send members missing roles
-        #print(mmmr)
-        await interaction.send("done")
+        # print(mmmr)
+        lines = []
+        for member, (add, remove) in mmmr.items():
+            strname = member.name + "#" + str(member.discriminator)
+            linestring = f"{strname:25}"
+            if add:
+                linestring += "".join([f" +{r.name:10}" for r in add])
+            if remove:
+                linestring += "".join([f" -{r.name:10}" for r in remove])
+            lines.append(linestring)
+
+        await interaction.send("```" + "\n".join(lines) + "```")
+
+    @nextcord.slash_command(dm_permission=True)
+    async def fix_roles(self, interaction: nextcord.Interaction, *, write: bool = False):
+        with open("req_roles.pickle", "rb") as file:
+            requested_roles = pickle.load(file)
+        dom_guild = [g for g in self.bot.guilds if g.id == 212660788786102272].pop()
+        mmmr = mismatching_roles(dom_guild, requested_roles)
+        if not write:
+            response = ['Running in dummy mode, not changing any roles']
+        else:
+            response = []
+        for member, (add, remove) in mmmr.items():
+            if add:
+                if write:
+                    await member.add_roles(*add, reason=f'Added in fix_roles on behest of {interaction.user}')
+                response.append(f'Added {[r.name for r in add]} to <@{member.id}>')
+
+            if remove:
+                if write:
+                    await member.remove_roles(*remove, reason=f'Added in fix_roles on behest of {interaction.user}')
+                response.append(f'Removed {[r.name for r in remove]} from <@{member.id}>')
+        await interaction.send('\n'.join(response))
 
 
 def main() -> None:
@@ -240,7 +302,7 @@ def main() -> None:
     sheet: Resource = service.spreadsheets()  # pylint: disable=no-member
 
     intents = nextcord.Intents.default()
-    intents.members = True
+    intents.members = True  # pylint: disable=assigning-non-slot
     # bot = MyBot(intents=intents, sheet_resource = sheet)
     bot = commands.Bot(intents=intents)
     bot.add_cog(MyCog(bot, sheet))
